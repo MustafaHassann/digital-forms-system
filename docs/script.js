@@ -56,24 +56,18 @@ async function handleLogin(username, password) {
         console.log('📊 Login response:', data);
         
         if (response.ok && data.token) {
-            // Success
-            localStorage.setItem('token', data.token);
-            localStorage.setItem('user', JSON.stringify(data.user));
-            
-            alert('✅ Login successful! Redirecting...');
-            
-            // Redirect to dashboard
-            setTimeout(() => {
-                window.location.href = 'dashboard.html';
-            }, 1000);
-            
-        } else {
-            // Error
-            alert(`❌ Login failed: ${data.message || 'Unknown error'}`);
-            if (submitBtn) {
-                submitBtn.disabled = false;
-                submitBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Login to System';
-            }
+    // Success
+    localStorage.setItem('token', data.token);
+    localStorage.setItem('user', JSON.stringify(data.user));
+    
+    console.log('✅ Login successful, redirecting to dashboard...');
+    
+    // IMPORTANT: Redirect to dashboard
+    window.location.href = 'dashboard.html';
+    
+} else {
+    // Error handling...
+}
         }
         
     } catch (error) {
