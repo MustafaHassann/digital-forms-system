@@ -2,7 +2,7 @@
 // Automatically detect environment
 const API_BASE_URL = window.location.hostname === 'localhost' 
     ? 'http://localhost:3000/api'
-    : 'https://your-backend-url.onrender.com/api'; // We'll update this later
+    : 'https://digital-forms-backend-c0wo.onrender.com/api'; // We'll update this later
 
 // DOM Elements
 const loginForm = document.getElementById('loginForm');

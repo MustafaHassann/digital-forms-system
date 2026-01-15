@@ -38,6 +38,8 @@ app.use('/api/', limiter);
 // Middleware
 app.use(cors({
     origin: process.env.FRONTEND_URL || 'http://localhost:5500',
+	'http://localhost:3000',
+	'https://github.com/MustafaHassann/digital-forms-system.git'
     credentials: true
 }));
 app.use(express.json());
