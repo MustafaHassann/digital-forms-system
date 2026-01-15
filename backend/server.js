@@ -1,20 +1,29 @@
 // ========== DIGITAL FORMS BACKEND API ==========
-// Simple, working version for Render
 const express = require('express');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
 
 const app = express();
 const PORT = process.env.PORT || 10000;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-123';
 
 // ========== MIDDLEWARE ==========
-// Allow all origins for now (we'll restrict later)
+// Configure CORS properly for Render
 app.use(cors({
-    origin: '*',
-    credentials: true
+    origin: [
+        'http://localhost:3000',
+        'http://127.0.0.1:5500',
+        'https://vipulchhabra1.github.io',
+        'https://*.github.io',
+        'https://*.github.io/*'
+    ],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
 }));
+
+// Handle preflight requests
+app.options('*', cors());
 
 // Parse JSON
 app.use(express.json());
@@ -51,7 +60,8 @@ app.get('/api/health', (req, res) => {
         status: 'OK',
         message: 'Digital Forms API is running',
         timestamp: new Date().toISOString(),
-        version: '1.0.0'
+        version: '1.0.0',
+        environment: process.env.NODE_ENV || 'development'
     });
 });
 
@@ -62,6 +72,7 @@ app.post('/api/auth/login', async (req, res) => {
         const { username, password } = req.body;
         
         console.log('Login attempt for:', username);
+        console.log('Request body:', req.body);
         
         // Find user
         const user = users.find(u => u.username === username);
@@ -72,8 +83,8 @@ app.post('/api/auth/login', async (req, res) => {
             });
         }
         
-        // For demo, accept any password that matches "admin123" or "password123"
-        // In production, use: const isValid = await bcrypt.compare(password, user.password);
+        // For demo, accept specific passwords
+        // In production, use bcrypt.compare
         const isValid = (username === 'admin' && password === 'admin123') || 
                        (username === 'agent1' && password === 'password123');
         
@@ -97,6 +108,8 @@ app.post('/api/auth/login', async (req, res) => {
         // Return user data (without password)
         const { password: _, ...userWithoutPassword } = user;
         
+        console.log('Login successful for:', username);
+        
         res.json({
             message: 'Login successful',
             token,
@@ -111,12 +124,54 @@ app.post('/api/auth/login', async (req, res) => {
     }
 });
 
+// Validate token endpoint
+app.post('/api/auth/validate', (req, res) => {
+    try {
+        const authHeader = req.headers.authorization;
+        
+        if (!authHeader) {
+            return res.json({ valid: false });
+        }
+        
+        const token = authHeader.split(' ')[1];
+        const decoded = jwt.verify(token, JWT_SECRET);
+        
+        // Check if user exists
+        const user = users.find(u => u.id === decoded.userId);
+        
+        if (!user) {
+            return res.json({ valid: false });
+        }
+        
+        res.json({ 
+            valid: true, 
+            user: {
+                id: user.id,
+                username: user.username,
+                role: user.role,
+                full_name: user.full_name
+            }
+        });
+        
+    } catch (error) {
+        res.json({ valid: false });
+    }
+});
+
 // ========== FORM LINKS ==========
 // Create form link
 app.post('/api/forms/create-link', (req, res) => {
     try {
+        const authHeader = req.headers.authorization;
+        
+        if (!authHeader) {
+            return res.status(401).json({ message: 'Unauthorized' });
+        }
+        
+        const token = authHeader.split(' ')[1];
+        const decoded = jwt.verify(token, JWT_SECRET);
+        
         const { unit_number, sales_agent } = req.body;
-        const user = { id: 1 }; // Mock user from JWT
         
         if (!unit_number || !sales_agent) {
             return res.status(400).json({
@@ -130,27 +185,27 @@ app.post('/api/forms/create-link', (req, res) => {
         
         const newLink = {
             id: linkId,
-            user_id: user.id,
+            user_id: decoded.userId,
             unit_number,
             sales_agent,
             link_code: linkCode,
             created_at: new Date().toISOString(),
-            expires_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(), // 14 days
+            expires_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
             status: 'active',
             submissions_count: 0
         };
         
         formLinks.push(newLink);
         
-        // Construct full URL
-        const fullUrl = `${req.protocol}://${req.get('host')}/form/${linkCode}`;
+        // Construct full URL for frontend
+        const fullUrl = `https://vipulchhabra1.github.io/digital-forms-system/form.html?code=${linkCode}`;
         
         res.status(201).json({
             message: 'Form link created successfully',
             link: {
                 id: newLink.id,
                 link_code: newLink.link_code,
-                full_url: `https://vipulchhabra1.github.io/digital-forms-system/form.html?code=${linkCode}`,
+                full_url: fullUrl,
                 unit_number: newLink.unit_number,
                 sales_agent: newLink.sales_agent
             }
@@ -167,9 +222,16 @@ app.post('/api/forms/create-link', (req, res) => {
 // Get user's form links
 app.get('/api/forms/my-links', (req, res) => {
     try {
-        const user = { id: 1 }; // Mock user
+        const authHeader = req.headers.authorization;
         
-        const userLinks = formLinks.filter(link => link.user_id === user.id);
+        if (!authHeader) {
+            return res.status(401).json({ message: 'Unauthorized' });
+        }
+        
+        const token = authHeader.split(' ')[1];
+        const decoded = jwt.verify(token, JWT_SECRET);
+        
+        const userLinks = formLinks.filter(link => link.user_id === decoded.userId);
         
         res.json({
             links: userLinks
@@ -236,9 +298,16 @@ app.post('/api/submissions/submit/:linkCode', (req, res) => {
 // Get user's submissions
 app.get('/api/submissions/my-submissions', (req, res) => {
     try {
-        const user = { id: 1 }; // Mock user
+        const authHeader = req.headers.authorization;
         
-        const userSubmissions = submissions.filter(sub => sub.user_id === user.id);
+        if (!authHeader) {
+            return res.status(401).json({ message: 'Unauthorized' });
+        }
+        
+        const token = authHeader.split(' ')[1];
+        const decoded = jwt.verify(token, JWT_SECRET);
+        
+        const userSubmissions = submissions.filter(sub => sub.user_id === decoded.userId);
         
         res.json({
             submissions: userSubmissions
@@ -252,13 +321,20 @@ app.get('/api/submissions/my-submissions', (req, res) => {
     }
 });
 
-// ========== DASHBOARD STATS ==========
+// Get dashboard stats
 app.get('/api/submissions/stats', (req, res) => {
     try {
-        const user = { id: 1 }; // Mock user
+        const authHeader = req.headers.authorization;
         
-        const userLinks = formLinks.filter(link => link.user_id === user.id);
-        const userSubmissions = submissions.filter(sub => sub.user_id === user.id);
+        if (!authHeader) {
+            return res.status(401).json({ message: 'Unauthorized' });
+        }
+        
+        const token = authHeader.split(' ')[1];
+        const decoded = jwt.verify(token, JWT_SECRET);
+        
+        const userLinks = formLinks.filter(link => link.user_id === decoded.userId);
+        const userSubmissions = submissions.filter(sub => sub.user_id === decoded.userId);
         
         res.json({
             stats: {
@@ -284,13 +360,33 @@ app.get('/', (req, res) => {
         endpoints: [
             'GET  /api/health',
             'POST /api/auth/login',
+            'POST /api/auth/validate',
             'POST /api/forms/create-link',
             'GET  /api/forms/my-links',
             'POST /api/submissions/submit/:code',
             'GET  /api/submissions/my-submissions',
             'GET  /api/submissions/stats'
         ],
-        documentation: 'See GitHub repository for details'
+        documentation: 'See GitHub repository for details',
+        status: 'running'
+    });
+});
+
+// ========== 404 HANDLER ==========
+app.use((req, res) => {
+    res.status(404).json({
+        error: 'Endpoint not found',
+        path: req.path,
+        method: req.method
+    });
+});
+
+// ========== ERROR HANDLER ==========
+app.use((err, req, res, next) => {
+    console.error('Server error:', err);
+    res.status(500).json({
+        error: 'Internal server error',
+        message: err.message
     });
 });
 
@@ -314,5 +410,11 @@ app.listen(PORT, () => {
     🔗 Test login with:
        Username: admin
        Password: admin123
+       
+    🌍 CORS enabled for:
+       - localhost
+       - GitHub Pages (*.github.io)
     `);
 });
+
+module.exports = app;
