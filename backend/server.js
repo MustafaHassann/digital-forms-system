@@ -2,7 +2,6 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const path = require('path');
 require('dotenv').config();
 
 // Import routes
@@ -10,45 +9,44 @@ const authRoutes = require('./routes/auth');
 const formRoutes = require('./routes/forms');
 const submissionRoutes = require('./routes/submissions');
 
-// Initialize database
-const { initializeDatabase } = require('./database');
+// Import database
+const { initializeDatabase, db } = require('./database');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000;
 
 // Security middleware
 app.use(helmet({
-    contentSecurityPolicy: {
-        directives: {
-            defaultSrc: ["'self'"],
-            styleSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
-            fontSrc: ["'self'", "https://cdnjs.cloudflare.com"],
-            scriptSrc: ["'self'", "'unsafe-inline'"]
-        }
-    }
+    contentSecurityPolicy: false  // Disable for API-only service
 }));
 
 // Rate limiting
 const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100 // limit each IP to 100 requests per windowMs
+    windowMs: 15 * 60 * 1000,
+    max: 100
 });
-app.use('/api/', limiter);
 
-// Middleware
+// CORS - Allow GitHub Pages and local development
 app.use(cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:5500',
-	'http://localhost:3000',
-	'https://github.com/MustafaHassann/digital-forms-system.git'
-    credentials: true
+    origin: [
+        'http://localhost:5500',
+        'http://localhost:3000',
+        'https://mustafahassann.github.io',
+        'https://mustafahassann.github.io/digital-forms-system'
+    ],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
+// Handle preflight requests
+app.options('*', cors());
+
+// Body parsing middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Serve static files
-app.use(express.static(path.join(__dirname, '../frontend')));
-
-// API Routes
+// API Routes ONLY - No static file serving!
 app.use('/api/auth', authRoutes);
 app.use('/api/forms', formRoutes);
 app.use('/api/submissions', submissionRoutes);
@@ -58,32 +56,79 @@ app.get('/api/health', (req, res) => {
     res.json({ 
         status: 'OK', 
         timestamp: new Date().toISOString(),
-        service: 'Digital Forms Management System'
+        service: 'Digital Forms Management System API',
+        version: '1.0.0'
     });
 });
 
-// Serve frontend
-app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '../frontend/index.html'));
+// Test endpoint for login (simple version for debugging)
+app.post('/api/auth/test-login', (req, res) => {
+    const { username, password } = req.body;
+    
+    console.log('Test login attempt:', { username });
+    
+    if (username === 'admin' && password === 'admin123') {
+        res.json({
+            message: 'Login successful',
+            token: 'test-jwt-token-' + Date.now(),
+            user: {
+                id: 1,
+                username: 'admin',
+                email: 'admin@digitalforms.com',
+                role: 'admin',
+                full_name: 'System Administrator'
+            }
+        });
+    } else {
+        res.status(401).json({
+            message: 'Invalid credentials'
+        });
+    }
+});
+
+// Root endpoint redirects to health check
+app.get('/', (req, res) => {
+    res.redirect('/api/health');
+});
+
+// 404 handler for undefined routes
+app.use('*', (req, res) => {
+    res.status(404).json({
+        error: 'Not Found',
+        message: 'API endpoint does not exist',
+        path: req.originalUrl
+    });
 });
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-    console.error(err.stack);
+    console.error('Server Error:', err.message);
     res.status(err.status || 500).json({
-        message: err.message || 'Internal server error',
-        ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+        error: 'Internal Server Error',
+        message: process.env.NODE_ENV === 'development' ? err.message : 'Something went wrong'
     });
 });
 
-// Initialize database and start server
-initializeDatabase().then(() => {
-    app.listen(PORT, () => {
-        console.log(`Digital Forms System running on port ${PORT}`);
-        console.log(`Frontend: http://localhost:${PORT}`);
-        console.log(`API: http://localhost:${PORT}/api`);
-    });
-}).catch(err => {
-    console.error('Failed to initialize database:', err);
-    process.exit(1);
-});
+// Initialize and start server
+async function startServer() {
+    try {
+        // Initialize database
+        await initializeDatabase();
+        console.log('✅ Database initialized');
+        
+        // Start server
+        app.listen(PORT, () => {
+            console.log(`🚀 Server running on port ${PORT}`);
+            console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
+            console.log(`🔗 Health check: http://localhost:${PORT}/api/health`);
+        });
+    } catch (error) {
+        console.error('❌ Failed to start server:', error);
+        process.exit(1);
+    }
+}
+
+// Start the server
+startServer();
+
+module.exports = app;
