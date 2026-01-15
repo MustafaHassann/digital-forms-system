@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Forms Management System | Login</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-left">
+            <!-- Company Logo Section -->
+            <div class="logo-section">
+                <div class="company-logo">
+                    <i class="fas fa-file-alt"></i>
+                    <span>DigitalForms</span>
+                </div>
+                <h1>Digital Forms Management System</h1>
+                <p>Secure internal portal for form collection and customer verification.</p>
+            </div>
+            
+            <div class="system-features">
+                <h2><i class="fas fa-shield-alt"></i> Secure & Compliant</h2>
+                <ul class="features-list">
+                    <li><i class="fas fa-user-lock"></i> Role-based access control</li>
+                    <li><i class="fas fa-file-contract"></i> Customizable form templates</li>
+                    <li><i class="fas fa-paper-plane"></i> Automated form distribution</li>
+                    <li><i class="fas fa-database"></i> Secure data storage</li>
+                    <li><i class="fas fa-chart-line"></i> Real-time analytics</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="login-right">
+            <div class="login-form-container">
+                <div class="login-header">
+                    <h2>System Login</h2>
+                    <p>Enter your credentials to access the portal</p>
+                </div>
+                
+                <div id="loginError" class="alert alert-danger" style="display: none;">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <span id="errorMessage">Invalid credentials</span>
+                </div>
+                
+                <form id="loginForm">
+                    <div class="form-group">
+                        <label for="username">
+                            <i class="fas fa-user"></i> Username
+                        </label>
+                        <input type="text" id="username" class="form-control" 
+                               placeholder="Enter your username" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="password">
+                            <i class="fas fa-lock"></i> Password
+                        </label>
+                        <input type="password" id="password" class="form-control" 
+                               placeholder="Enter your password" required>
+                    </div>
+                    
+                    <div class="form-options">
+                        <label class="checkbox">
+                            <input type="checkbox" id="rememberMe">
+                            <span>Remember me</span>
+                        </label>
+                        <a href="#" class="forgot-link">Forgot password?</a>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary btn-login">
+                        <i class="fas fa-sign-in-alt"></i> Login to System
+                    </button>
+                </form>
+                
+                <div class="login-footer">
+                    <p>For demo access, contact your system administrator</p>
+                    <p class="version">v1.0.0 | Secure Digital Forms System</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>
