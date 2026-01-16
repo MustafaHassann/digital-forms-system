@@ -1,0 +1,802 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Forms Management System | Dashboard</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* Additional Dashboard Styles */
+        .recent-activity {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-top: 30px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        }
+        
+        .recent-activity h3 {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            color: #2c3e50;
+        }
+        
+        .activity-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .activity-item {
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .activity-item:last-child {
+            border-bottom: none;
+        }
+        
+        .activity-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #f8f9fa;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #3498db;
+            font-size: 18px;
+        }
+        
+        .activity-content {
+            flex: 1;
+        }
+        
+        .activity-message {
+            font-weight: 500;
+            color: #2c3e50;
+        }
+        
+        .activity-time {
+            font-size: 12px;
+            color: #95a5a6;
+            margin-top: 5px;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #95a5a6;
+        }
+        
+        .empty-state i {
+            font-size: 48px;
+            margin-bottom: 15px;
+            opacity: 0.3;
+        }
+        
+        .header-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        /* Modal Styles */
+        #generateLinkModal .modal-content {
+            max-width: 600px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        
+        .form-control {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid #e0e6ed;
+            border-radius: 8px;
+            font-size: 15px;
+            transition: all 0.3s;
+        }
+        
+        .form-control:focus {
+            outline: none;
+            border-color: #3498db;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+        }
+        
+        .text-muted {
+            color: #95a5a6;
+            font-size: 13px;
+            margin-top: 5px;
+        }
+        
+        /* Generated Link Modal */
+        .generated-link-box {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 2px dashed #dee2e6;
+        }
+        
+        .link-input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .link-input {
+            flex: 1;
+            padding: 12px 15px;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            background: white;
+            font-size: 14px;
+        }
+        
+        .link-details {
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        
+        .link-details strong {
+            color: #2c3e50;
+        }
+        
+        /* Quick Actions */
+        .quick-actions {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 30px;
+        }
+        
+        .quick-action-btn {
+            background: white;
+            border: 1px solid #e0e6ed;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .quick-action-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+            border-color: #3498db;
+        }
+        
+        .quick-action-btn i {
+            font-size: 32px;
+            color: #3498db;
+            margin-bottom: 10px;
+        }
+        
+        .quick-action-btn span {
+            display: block;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading Indicator -->
+    <div id="loadingIndicator" class="loading-indicator" style="display: none;">
+        <i class="fas fa-spinner fa-spin"></i>
+        <div style="margin-top: 15px; font-weight: 600; color: #2c3e50;">Loading...</div>
+    </div>
+    
+    <!-- Dashboard Container -->
+    <div id="dashboard" class="dashboard-container">
+        <!-- Header -->
+        <header class="dashboard-header">
+            <div class="header-left">
+                <div class="header-logo">
+                    <i class="fas fa-file-alt"></i>
+                    <span>DigitalForms</span>
+                </div>
+                <div class="user-info" id="currentUserInfo">
+                    <!-- Will be populated by JavaScript -->
+                </div>
+            </div>
+            <button class="btn btn-outline" onclick="logout()">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </button>
+        </header>
+
+        <!-- Sidebar -->
+        <nav class="dashboard-sidebar">
+            <ul class="sidebar-menu">
+                <li><a href="#" class="active" onclick="showSection('dashboard')">
+                    <i class="fas fa-tachometer-alt"></i> <span>Dashboard</span>
+                </a></li>
+                <li><a href="#" onclick="showGenerateLinkModal()">
+                    <i class="fas fa-plus-circle"></i> <span>Create Form Link</span>
+                </a></li>
+                <li><a href="#" onclick="showSection('myLinks')">
+                    <i class="fas fa-link"></i> <span>My Form Links</span>
+                    <span class="badge" id="linksCount">0</span>
+                </a></li>
+                <li><a href="#" onclick="showSection('submissions')">
+                    <i class="fas fa-file-alt"></i> <span>Form Submissions</span>
+                    <span class="badge" id="submissionsCount">0</span>
+                </a></li>
+                <li id="adminMenu" style="display: none;">
+                    <a href="#" onclick="showSection('admin')">
+                        <i class="fas fa-user-cog"></i> <span>Admin Panel</span>
+                    </a>
+                </li>
+                <li><a href="#" onclick="showSection('settings')">
+                    <i class="fas fa-cog"></i> <span>Settings</span>
+                </a></li>
+            </ul>
+        </nav>
+
+        <!-- Main Content Area -->
+        <main class="dashboard-content" id="contentArea">
+            <!-- Content will be loaded dynamically by JavaScript -->
+        </main>
+
+        <!-- Modals -->
+        
+        <!-- Generate Link Modal -->
+        <div id="generateLinkModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3><i class="fas fa-link"></i> Create Form Link</h3>
+                    <button class="btn btn-outline" onclick="closeModal('generateLinkModal')">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <form id="generateForm">
+                        <div class="form-group">
+                            <label for="unitNumber">Unit / Project Reference *</label>
+                            <input type="text" id="unitNumber" class="form-control" 
+                                   placeholder="e.g., Project-XYZ, Unit-101" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="salesAgent">Assigned Agent *</label>
+                            <input type="text" id="salesAgent" class="form-control" 
+                                   placeholder="Agent name or ID" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="clientEmail">Client Email (Optional)</label>
+                            <input type="email" id="clientEmail" class="form-control" 
+                                   placeholder="client@example.com">
+                            <div class="text-muted">If provided, the link will be emailed automatically</div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="expiryDays">Link Validity Period</label>
+                            <select id="expiryDays" class="form-control">
+                                <option value="7">7 Days</option>
+                                <option value="14" selected>14 Days</option>
+                                <option value="30">30 Days</option>
+                                <option value="60">60 Days</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="formNotes">Additional Notes (Optional)</label>
+                            <textarea id="formNotes" class="form-control" rows="3" 
+                                      placeholder="Any specific instructions for the client..."></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-outline" onclick="closeModal('generateLinkModal')">Cancel</button>
+                    <button class="btn btn-primary" onclick="generateFormLink()">
+                        <i class="fas fa-link"></i> Generate Link
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Link Generated Success Modal -->
+        <div id="linkGeneratedModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3><i class="fas fa-check-circle" style="color: #27ae60;"></i> Link Created Successfully!</h3>
+                    <button class="btn btn-outline" onclick="closeModal('linkGeneratedModal')">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="generated-link-box">
+                        <h4 style="margin-bottom: 15px; color: #2c3e50;">Your Form Link:</h4>
+                        <div class="link-input-group">
+                            <input type="text" id="generatedLink" class="link-input" readonly>
+                            <button class="btn btn-primary" onclick="copyLink()">
+                                <i class="fas fa-copy"></i> Copy
+                            </button>
+                        </div>
+                        <div class="text-muted">Share this link with your client to collect form submissions</div>
+                    </div>
+                    
+                    <div class="link-details" id="linkDetails">
+                        <!-- Link details will be populated here -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-outline" onclick="closeModal('linkGeneratedModal')">Close</button>
+                    <button class="btn btn-primary" onclick="window.open(document.getElementById('generatedLink').value, '_blank')">
+                        <i class="fas fa-external-link-alt"></i> Open Link
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="dashboard.js"></script>
+    <script>
+        // Additional dashboard functions
+        function getMyLinksHTML() {
+            return `
+                <div class="page-title">
+                    <h1><i class="fas fa-link"></i> My Form Links</h1>
+                    <div class="header-actions">
+                        <button class="btn btn-primary" onclick="showGenerateLinkModal()">
+                            <i class="fas fa-plus"></i> Create New Link
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="linksContent">
+                    <!-- Links will be loaded here -->
+                    <div class="loading-indicator" style="position: relative; transform: none; box-shadow: none;">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <div>Loading form links...</div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        function getSubmissionsHTML() {
+            return `
+                <div class="page-title">
+                    <h1><i class="fas fa-file-alt"></i> Form Submissions</h1>
+                </div>
+                
+                <div id="submissionsContent">
+                    <!-- Submissions will be loaded here -->
+                    <div class="loading-indicator" style="position: relative; transform: none; box-shadow: none;">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <div>Loading submissions...</div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        function getCreateLinkHTML() {
+            return `
+                <div class="page-title">
+                    <h1><i class="fas fa-plus-circle"></i> Create Form Link</h1>
+                </div>
+                
+                <div style="max-width: 600px; margin: 0 auto;">
+                    <div class="form-section" style="border-left-color: #3498db;">
+                        <h3><i class="fas fa-link"></i> Generate New Form Link</h3>
+                        <p style="color: #7f8c8d; margin-bottom: 30px;">
+                            Create a unique form link to share with clients. Each link can be customized with specific details and validity period.
+                        </p>
+                        
+                        <form id="createLinkForm">
+                            <div class="form-group">
+                                <label for="createUnitNumber">Unit / Project Reference *</label>
+                                <input type="text" id="createUnitNumber" class="form-control" 
+                                       placeholder="e.g., Project-XYZ, Unit-101" required>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="createSalesAgent">Assigned Agent *</label>
+                                <input type="text" id="createSalesAgent" class="form-control" 
+                                       placeholder="Agent name or ID" required>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="createClientEmail">Client Email (Optional)</label>
+                                <input type="email" id="createClientEmail" class="form-control" 
+                                       placeholder="client@example.com">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="createExpiryDays">Link Validity Period</label>
+                                <select id="createExpiryDays" class="form-control">
+                                    <option value="7">7 Days</option>
+                                    <option value="14" selected>14 Days</option>
+                                    <option value="30">30 Days</option>
+                                    <option value="60">60 Days</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="createFormNotes">Additional Notes (Optional)</label>
+                                <textarea id="createFormNotes" class="form-control" rows="3" 
+                                          placeholder="Any specific instructions for the client..."></textarea>
+                            </div>
+                            
+                            <div class="form-footer" style="border-top: none; padding-top: 0;">
+                                <button type="button" class="btn btn-primary" onclick="generateFormLinkFromPage()" 
+                                        style="padding: 15px 40px; font-size: 16px;">
+                                    <i class="fas fa-link"></i> Generate Form Link
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                    
+                    <div class="quick-actions">
+                        <div class="quick-action-btn" onclick="showSection('myLinks')">
+                            <i class="fas fa-list"></i>
+                            <span>View All Links</span>
+                        </div>
+                        <div class="quick-action-btn" onclick="showSection('submissions')">
+                            <i class="fas fa-file-alt"></i>
+                            <span>View Submissions</span>
+                        </div>
+                        <div class="quick-action-btn" onclick="showSection('dashboard')">
+                            <i class="fas fa-tachometer-alt"></i>
+                            <span>Back to Dashboard</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        function getAdminHTML() {
+            return `
+                <div class="page-title">
+                    <h1><i class="fas fa-user-cog"></i> Admin Panel</h1>
+                </div>
+                
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: rgba(52, 152, 219, 0.1); color: #3498db;">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3 id="totalUsers">0</h3>
+                            <p>Total Users</p>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: rgba(46, 204, 113, 0.1); color: #2ecc71;">
+                            <i class="fas fa-link"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3 id="totalSystemLinks">0</h3>
+                            <p>System Links</p>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: rgba(155, 89, 182, 0.1); color: #9b59b6;">
+                            <i class="fas fa-file-alt"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3 id="totalSystemSubmissions">0</h3>
+                            <p>Total Submissions</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="action-grid">
+                    <div class="action-card">
+                        <h3><i class="fas fa-users"></i> User Management</h3>
+                        <p>Manage system users, roles, and permissions.</p>
+                        <button class="btn btn-primary" onclick="manageUsers()">
+                            <i class="fas fa-user-edit"></i> Manage Users
+                        </button>
+                    </div>
+                    
+                    <div class="action-card">
+                        <h3><i class="fas fa-chart-bar"></i> System Analytics</h3>
+                        <p>View detailed system analytics and reports.</p>
+                        <button class="btn btn-primary" onclick="viewAnalytics()">
+                            <i class="fas fa-chart-line"></i> View Analytics
+                        </button>
+                    </div>
+                    
+                    <div class="action-card">
+                        <h3><i class="fas fa-cog"></i> System Settings</h3>
+                        <p>Configure system settings and preferences.</p>
+                        <button class="btn btn-primary" onclick="systemSettings()">
+                            <i class="fas fa-sliders-h"></i> Settings
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+        
+        function getSettingsHTML() {
+            return `
+                <div class="page-title">
+                    <h1><i class="fas fa-cog"></i> Settings</h1>
+                </div>
+                
+                <div style="max-width: 600px; margin: 0 auto;">
+                    <div class="form-section">
+                        <h3><i class="fas fa-user"></i> Profile Settings</h3>
+                        
+                        <div class="form-group">
+                            <label>Full Name</label>
+                            <input type="text" class="form-control" value="${currentUser?.full_name || currentUser?.username}" disabled>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Email Address</label>
+                            <input type="email" class="form-control" value="${currentUser?.email || 'Not set'}" disabled>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Role</label>
+                            <input type="text" class="form-control" value="${currentUser?.role?.toUpperCase() || 'USER'}" disabled>
+                        </div>
+                    </div>
+                    
+                    <div class="form-section">
+                        <h3><i class="fas fa-lock"></i> Security</h3>
+                        
+                        <div class="form-group">
+                            <label>Change Password</label>
+                            <input type="password" class="form-control" placeholder="Current Password">
+                        </div>
+                        
+                        <div class="form-group">
+                            <input type="password" class="form-control" placeholder="New Password">
+                        </div>
+                        
+                        <div class="form-group">
+                            <input type="password" class="form-control" placeholder="Confirm New Password">
+                        </div>
+                        
+                        <button class="btn btn-primary" style="width: 100%;">
+                            <i class="fas fa-key"></i> Update Password
+                        </button>
+                    </div>
+                    
+                    <div class="form-section">
+                        <h3><i class="fas fa-bell"></i> Notifications</h3>
+                        
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: flex; align-items: center; gap: 10px;">
+                                <input type="checkbox" checked>
+                                <span>Email notifications for new submissions</span>
+                            </label>
+                        </div>
+                        
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: flex; align-items: center; gap: 10px;">
+                                <input type="checkbox" checked>
+                                <span>Link expiration reminders</span>
+                            </label>
+                        </div>
+                        
+                        <button class="btn btn-primary" style="width: 100%;">
+                            <i class="fas fa-save"></i> Save Preferences
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+        
+        function generateFormLinkFromPage() {
+            const unitNumber = document.getElementById('createUnitNumber').value.trim();
+            const salesAgent = document.getElementById('createSalesAgent').value.trim();
+            const clientEmail = document.getElementById('createClientEmail').value.trim();
+            const expiryDays = document.getElementById('createExpiryDays').value;
+            const formNotes = document.getElementById('createFormNotes').value.trim();
+            
+            if (!unitNumber || !salesAgent) {
+                alert('Please fill in Unit Number and Sales Agent');
+                return;
+            }
+            
+            // Use the existing generateFormLink function
+            document.getElementById('unitNumber').value = unitNumber;
+            document.getElementById('salesAgent').value = salesAgent;
+            document.getElementById('clientEmail').value = clientEmail;
+            document.getElementById('expiryDays').value = expiryDays;
+            document.getElementById('formNotes').value = formNotes;
+            
+            generateFormLink();
+        }
+        
+        function loadAndDisplayLinks() {
+            const linksContent = document.getElementById('linksContent');
+            if (!linksContent) return;
+            
+            if (formLinks.length === 0) {
+                linksContent.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-link"></i>
+                        <h4>No Form Links Yet</h4>
+                        <p>Create your first form link to start collecting submissions from clients.</p>
+                        <button class="btn btn-primary" onclick="showGenerateLinkModal()" style="margin-top: 20px;">
+                            <i class="fas fa-plus"></i> Create Your First Link
+                        </button>
+                    </div>
+                `;
+                return;
+            }
+            
+            let html = `
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Unit Number</th>
+                                <th>Sales Agent</th>
+                                <th>Created</th>
+                                <th>Expires</th>
+                                <th>Status</th>
+                                <th>Submissions</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+            
+            formLinks.forEach(link => {
+                const isExpired = new Date(link.expires_at) < new Date();
+                const status = isExpired ? 'Expired' : (link.status || 'Active');
+                const statusClass = isExpired ? 'badge-danger' : 'badge-success';
+                const statusText = isExpired ? 'Expired' : 'Active';
+                
+                html += `
+                    <tr>
+                        <td>${link.unit_number}</td>
+                        <td>${link.sales_agent}</td>
+                        <td>${new Date(link.created_at).toLocaleDateString()}</td>
+                        <td>${new Date(link.expires_at).toLocaleDateString()}</td>
+                        <td><span class="badge ${statusClass}">${statusText}</span></td>
+                        <td>${link.submissions_count || 0}</td>
+                        <td>
+                            <button class="btn btn-outline" style="padding: 5px 10px; font-size: 12px;" 
+                                    onclick="copyLinkToClipboard('${link.link_code}')">
+                                <i class="fas fa-copy"></i> Copy
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            html += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
+            
+            linksContent.innerHTML = html;
+        }
+        
+        function loadAndDisplaySubmissions() {
+            const submissionsContent = document.getElementById('submissionsContent');
+            if (!submissionsContent) return;
+            
+            if (submissions.length === 0) {
+                submissionsContent.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-inbox"></i>
+                        <h4>No Submissions Yet</h4>
+                        <p>When clients submit forms using your links, they will appear here.</p>
+                        <button class="btn btn-primary" onclick="showGenerateLinkModal()" style="margin-top: 20px;">
+                            <i class="fas fa-link"></i> Create Form Link
+                        </button>
+                    </div>
+                `;
+                return;
+            }
+            
+            let html = `
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Customer</th>
+                                <th>Email</th>
+                                <th>Unit</th>
+                                <th>Submitted</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+            
+            submissions.forEach(sub => {
+                const status = sub.status || 'pending';
+                const statusColors = {
+                    'pending': { class: 'badge-warning', text: 'Pending' },
+                    'approved': { class: 'badge-success', text: 'Approved' },
+                    'rejected': { class: 'badge-danger', text: 'Rejected' }
+                };
+                const statusConfig = statusColors[status] || statusColors.pending;
+                
+                html += `
+                    <tr>
+                        <td>${sub.customer_name}</td>
+                        <td>${sub.customer_email || 'N/A'}</td>
+                        <td>${sub.unit_number}</td>
+                        <td>${new Date(sub.submitted_at).toLocaleDateString()}</td>
+                        <td><span class="badge ${statusConfig.class}">${statusConfig.text}</span></td>
+                        <td>
+                            <button class="btn btn-outline" style="padding: 5px 10px; font-size: 12px;" 
+                                    onclick="viewSubmission('${sub.id}')">
+                                <i class="fas fa-eye"></i> View
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            html += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
+            
+            submissionsContent.innerHTML = html;
+        }
+        
+        function copyLinkToClipboard(linkCode) {
+            const baseUrl = window.location.origin;
+            const fullUrl = `${baseUrl}/form.html?code=${linkCode}`;
+            
+            navigator.clipboard.writeText(fullUrl)
+                .then(() => {
+                    alert('Link copied to clipboard!');
+                })
+                .catch(err => {
+                    console.error('Failed to copy:', err);
+                    alert('Failed to copy link');
+                });
+        }
+        
+        function viewSubmission(submissionId) {
+            const submission = submissions.find(s => s.id === submissionId);
+            if (!submission) return;
+            
+            alert(`Submission Details:\n\nCustomer: ${submission.customer_name}\nEmail: ${submission.customer_email || 'N/A'}\nUnit: ${submission.unit_number}\nSubmitted: ${new Date(submission.submitted_at).toLocaleString()}\nStatus: ${submission.status}`);
+        }
+        
+        function manageUsers() {
+            alert('User management feature would open here.');
+        }
+        
+        function viewAnalytics() {
+            alert('System analytics feature would open here.');
+        }
+        
+        function systemSettings() {
+            alert('System settings feature would open here.');
+        }
+        
+        // Initialize dashboard on load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Show dashboard by default
+            if (document.getElementById('contentArea')) {
+                document.getElementById('contentArea').innerHTML = getDashboardHTML();
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,7 +1,7 @@
 {
   "name": "digital-forms-api",
   "version": "1.0.0",
-  "description": "Simple backend for Digital Forms System",
+  "description": "Backend API for Digital Forms Management System",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -10,10 +10,10 @@
   "dependencies": {
     "express": "^4.18.2",
     "cors": "^2.8.5",
-    "bcryptjs": "^2.4.3",
-    "jsonwebtoken": "^9.0.0"
+    "jsonwebtoken": "^9.0.2",
+    "bcryptjs": "^2.4.3"
   },
   "engines": {
-    "node": ">=14.0.0"
+    "node": ">=18.0.0"
   }
 }

@@ -1,0 +1,9 @@
+{
+  "name": "digital-forms-frontend",
+  "version": "1.0.0",
+  "description": "Frontend for Digital Forms Management System",
+  "scripts": {
+    "serve": "python3 -m http.server 8000",
+    "test": "echo \"No tests specified\" && exit 0"
+  }
+}
