@@ -70,6 +70,12 @@ const checkPassword = (username, password) => {
            (username === 'agent1' && password === 'password123');
 };
 
+// Hash password function
+const hashPassword = (password) => {
+    // In production, use bcrypt
+    return password; // Simplified for demo
+};
+
 // ========== HELPER FUNCTIONS ==========
 const generateLinkCode = () => {
     return Math.random().toString(36).substring(2, 10) + 
@@ -126,7 +132,292 @@ const isAdmin = (req, res, next) => {
     next();
 };
 
-// ========== API ENDPOINTS ==========
+// ========== USER MANAGEMENT API ENDPOINTS ==========
+
+// Get all users (Admin only)
+app.get('/api/admin/users', authenticate, isAdmin, (req, res) => {
+    try {
+        const userList = users.map(user => {
+            const { password, ...userData } = user;
+            return userData;
+        });
+        
+        res.json({
+            success: true,
+            data: userList
+        });
+        
+    } catch (error) {
+        console.error('Get users error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to retrieve users'
+        });
+    }
+});
+
+// Get single user
+app.get('/api/admin/users/:id', authenticate, isAdmin, (req, res) => {
+    try {
+        const userId = parseInt(req.params.id);
+        const user = users.find(u => u.id === userId);
+        
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+        
+        const { password, ...userData } = user;
+        res.json({
+            success: true,
+            data: userData
+        });
+        
+    } catch (error) {
+        console.error('Get user error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to retrieve user'
+        });
+    }
+});
+
+// Create new user
+app.post('/api/admin/users', authenticate, isAdmin, (req, res) => {
+    try {
+        const { username, email, full_name, role, department, password } = req.body;
+        
+        if (!username || !email || !full_name || !role || !password) {
+            return res.status(400).json({
+                success: false,
+                message: 'All required fields must be filled'
+            });
+        }
+        
+        // Check if user exists
+        const existingUser = users.find(u => u.username === username || u.email === email);
+        if (existingUser) {
+            return res.status(400).json({
+                success: false,
+                message: 'Username or email already exists'
+            });
+        }
+        
+        // Generate new user ID
+        const newId = users.length > 0 ? Math.max(...users.map(u => u.id)) + 1 : 1;
+        
+        const newUser = {
+            id: newId,
+            username,
+            email,
+            full_name,
+            role: role.toLowerCase(),
+            department: department || 'General',
+            password: hashPassword(password),
+            is_active: true,
+            created_at: new Date().toISOString(),
+            last_login: null
+        };
+        
+        users.push(newUser);
+        
+        // Log activity
+        activityLogs.push({
+            id: generateId('log'),
+            user_id: req.user.userId,
+            action: 'create_user',
+            details: `Created new user: ${username} (${role})`,
+            created_at: new Date().toISOString()
+        });
+        
+        const { password: _, ...userData } = newUser;
+        
+        res.status(201).json({
+            success: true,
+            message: 'User created successfully',
+            data: userData
+        });
+        
+    } catch (error) {
+        console.error('Create user error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to create user'
+        });
+    }
+});
+
+// Update user
+app.put('/api/admin/users/:id', authenticate, isAdmin, (req, res) => {
+    try {
+        const userId = parseInt(req.params.id);
+        const { username, email, full_name, role, department, is_active, password } = req.body;
+        
+        const userIndex = users.findIndex(u => u.id === userId);
+        
+        if (userIndex === -1) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+        
+        // Check if username/email conflicts with other users
+        const duplicateUser = users.find((u, index) => 
+            index !== userIndex && (u.username === username || u.email === email)
+        );
+        
+        if (duplicateUser) {
+            return res.status(400).json({
+                success: false,
+                message: 'Username or email already exists'
+            });
+        }
+        
+        // Update user
+        const updatedUser = {
+            ...users[userIndex],
+            username: username || users[userIndex].username,
+            email: email || users[userIndex].email,
+            full_name: full_name || users[userIndex].full_name,
+            role: role || users[userIndex].role,
+            department: department || users[userIndex].department,
+            is_active: is_active !== undefined ? is_active : users[userIndex].is_active,
+            password: password ? hashPassword(password) : users[userIndex].password
+        };
+        
+        users[userIndex] = updatedUser;
+        
+        // Log activity
+        activityLogs.push({
+            id: generateId('log'),
+            user_id: req.user.userId,
+            action: 'update_user',
+            details: `Updated user: ${updatedUser.username}`,
+            created_at: new Date().toISOString()
+        });
+        
+        const { password: _, ...userData } = updatedUser;
+        
+        res.json({
+            success: true,
+            message: 'User updated successfully',
+            data: userData
+        });
+        
+    } catch (error) {
+        console.error('Update user error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to update user'
+        });
+    }
+});
+
+// Delete user
+app.delete('/api/admin/users/:id', authenticate, isAdmin, (req, res) => {
+    try {
+        const userId = parseInt(req.params.id);
+        
+        // Prevent deleting yourself
+        if (userId === req.user.userId) {
+            return res.status(400).json({
+                success: false,
+                message: 'Cannot delete your own account'
+            });
+        }
+        
+        const userIndex = users.findIndex(u => u.id === userId);
+        
+        if (userIndex === -1) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+        
+        const deletedUser = users[userIndex];
+        
+        // Remove user
+        users.splice(userIndex, 1);
+        
+        // Log activity
+        activityLogs.push({
+            id: generateId('log'),
+            user_id: req.user.userId,
+            action: 'delete_user',
+            details: `Deleted user: ${deletedUser.username}`,
+            created_at: new Date().toISOString()
+        });
+        
+        const { password: _, ...userData } = deletedUser;
+        
+        res.json({
+            success: true,
+            message: 'User deleted successfully',
+            data: userData
+        });
+        
+    } catch (error) {
+        console.error('Delete user error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to delete user'
+        });
+    }
+});
+
+// Reset user password
+app.post('/api/admin/users/:id/reset-password', authenticate, isAdmin, (req, res) => {
+    try {
+        const userId = parseInt(req.params.id);
+        const { new_password } = req.body;
+        
+        if (!new_password) {
+            return res.status(400).json({
+                success: false,
+                message: 'New password is required'
+            });
+        }
+        
+        const userIndex = users.findIndex(u => u.id === userId);
+        
+        if (userIndex === -1) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+        
+        // Update password
+        users[userIndex].password = hashPassword(new_password);
+        
+        // Log activity
+        activityLogs.push({
+            id: generateId('log'),
+            user_id: req.user.userId,
+            action: 'reset_password',
+            details: `Reset password for user: ${users[userIndex].username}`,
+            created_at: new Date().toISOString()
+        });
+        
+        res.json({
+            success: true,
+            message: 'Password reset successfully'
+        });
+        
+    } catch (error) {
+        console.error('Reset password error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to reset password'
+        });
+    }
+});
+
+// ========== OTHER API ENDPOINTS (keep existing ones) ==========
 
 // 1. Health Check
 app.get('/api/health', (req, res) => {
@@ -515,28 +806,7 @@ app.get('/api/dashboard/stats', authenticate, (req, res) => {
     }
 });
 
-// 6. Admin Endpoints
-app.get('/api/admin/users', authenticate, isAdmin, (req, res) => {
-    try {
-        const userList = users.map(user => {
-            const { password, ...userData } = user;
-            return userData;
-        });
-        
-        res.json({
-            success: true,
-            data: userList
-        });
-        
-    } catch (error) {
-        console.error('Get users error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to retrieve users'
-        });
-    }
-});
-
+// 6. Other Admin Endpoints
 app.get('/api/admin/all-links', authenticate, isAdmin, (req, res) => {
     try {
         const allLinks = formLinks.map(link => {
@@ -599,6 +869,14 @@ app.listen(PORT, () => {
     ✅ POST /api/submissions/submit/:code - Submit form
     ✅ GET  /api/submissions/my-submissions - Get submissions
     ✅ GET  /api/dashboard/stats     - Dashboard statistics
+    
+    👤 USER MANAGEMENT:
+    ✅ GET  /api/admin/users         - Get all users (Admin only)
+    ✅ GET  /api/admin/users/:id     - Get single user (Admin only)
+    ✅ POST /api/admin/users         - Create user (Admin only)
+    ✅ PUT  /api/admin/users/:id     - Update user (Admin only)
+    ✅ DELETE /api/admin/users/:id   - Delete user (Admin only)
+    ✅ POST /api/admin/users/:id/reset-password - Reset password (Admin only)
     
     👤 Demo Users:
        Admin:  admin / admin123
