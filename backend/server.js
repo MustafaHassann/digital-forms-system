@@ -1,5 +1,4 @@
 // ========== DIGITAL FORMS MANAGEMENT SYSTEM API - PRODUCTION READY ==========
-require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
@@ -25,7 +24,13 @@ app.use(cors({
 app.options('*', cors());
 app.use(express.json());
 
-// Authentication middleware
+// Logging middleware
+app.use((req, res, next) => {
+    console.log(`${new Date().toISOString()} ${req.method} ${req.path}`);
+    next();
+});
+
+// ========== AUTHENTICATION MIDDLEWARE ==========
 const authenticate = (req, res, next) => {
     try {
         const authHeader = req.headers.authorization;
@@ -50,7 +55,6 @@ const authenticate = (req, res, next) => {
     }
 };
 
-// Admin middleware
 const isAdmin = (req, res, next) => {
     if (req.user.role !== 'admin') {
         return res.status(403).json({ 
@@ -61,7 +65,7 @@ const isAdmin = (req, res, next) => {
     next();
 };
 
-// ========== DATABASE (In-memory - Replace with real DB in production) ==========
+// ========== IN-MEMORY DATABASE ==========
 // Users database with hashed passwords
 const users = [
     {
@@ -105,6 +109,23 @@ const logActivity = (userId, action, details) => {
         timestamp: new Date().toISOString()
     });
 };
+
+// ========== HEALTH CHECK (REQUIRED FOR RENDER) ==========
+app.get('/api/health', (req, res) => {
+    res.json({
+        success: true,
+        status: 'OK',
+        message: 'Digital Forms API is running',
+        timestamp: new Date().toISOString(),
+        version: '1.0.0',
+        environment: process.env.NODE_ENV || 'production',
+        stats: {
+            users: users.length,
+            formLinks: formLinks.length,
+            submissions: submissions.length
+        }
+    });
+});
 
 // ========== AUTHENTICATION ENDPOINTS ==========
 app.post('/api/auth/login', async (req, res) => {
@@ -217,173 +238,12 @@ app.post('/api/auth/change-password', authenticate, async (req, res) => {
     }
 });
 
-// ========== USER MANAGEMENT (ADMIN ONLY) ==========
-app.get('/api/admin/users', authenticate, isAdmin, (req, res) => {
-    try {
-        const userList = users.map(user => {
-            const { password, ...userData } = user;
-            return userData;
-        });
-        
-        res.json({
-            success: true,
-            data: userList
-        });
-        
-    } catch (error) {
-        console.error('Get users error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to retrieve users'
-        });
-    }
-});
-
-app.post('/api/admin/users', authenticate, isAdmin, async (req, res) => {
-    try {
-        const { username, email, full_name, role, department, password } = req.body;
-        
-        if (!username || !email || !full_name || !role || !password) {
-            return res.status(400).json({
-                success: false,
-                message: 'All fields are required'
-            });
-        }
-        
-        // Check if user already exists
-        if (users.find(u => u.username === username)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Username already exists'
-            });
-        }
-        
-        if (users.find(u => u.email === email)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Email already exists'
-            });
-        }
-        
-        const newUser = {
-            id: users.length + 1,
-            username,
-            email,
-            full_name,
-            role,
-            department: department || null,
-            password: await bcrypt.hash(password, 10),
-            is_active: true,
-            created_at: new Date().toISOString(),
-            last_login: null
-        };
-        
-        users.push(newUser);
-        
-        logActivity(req.user.userId, 'create_user', `Created user: ${username}`);
-        
-        const { password: _, ...userData } = newUser;
-        
-        res.status(201).json({
-            success: true,
-            message: 'User created successfully',
-            data: userData
-        });
-        
-    } catch (error) {
-        console.error('Create user error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to create user'
-        });
-    }
-});
-
-app.put('/api/admin/users/:userId', authenticate, isAdmin, async (req, res) => {
-    try {
-        const userId = parseInt(req.params.userId);
-        const { email, full_name, role, department, is_active, password } = req.body;
-        
-        const user = users.find(u => u.id === userId);
-        
-        if (!user) {
-            return res.status(404).json({
-                success: false,
-                message: 'User not found'
-            });
-        }
-        
-        // Update fields
-        if (email !== undefined) user.email = email;
-        if (full_name !== undefined) user.full_name = full_name;
-        if (role !== undefined) user.role = role;
-        if (department !== undefined) user.department = department;
-        if (is_active !== undefined) user.is_active = is_active;
-        
-        // Update password if provided
-        if (password) {
-            user.password = await bcrypt.hash(password, 10);
-        }
-        
-        logActivity(req.user.userId, 'update_user', `Updated user: ${user.username}`);
-        
-        const { password: _, ...userData } = user;
-        
-        res.json({
-            success: true,
-            message: 'User updated successfully',
-            data: userData
-        });
-        
-    } catch (error) {
-        console.error('Update user error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to update user'
-        });
-    }
-});
-
-app.delete('/api/admin/users/:userId', authenticate, isAdmin, (req, res) => {
-    try {
-        const userId = parseInt(req.params.userId);
-        
-        // Don't allow deleting self
-        if (userId === req.user.userId) {
-            return res.status(400).json({
-                success: false,
-                message: 'Cannot delete your own account'
-            });
-        }
-        
-        const userIndex = users.findIndex(u => u.id === userId);
-        
-        if (userIndex === -1) {
-            return res.status(404).json({
-                success: false,
-                message: 'User not found'
-            });
-        }
-        
-        const user = users[userIndex];
-        
-        // Soft delete - mark as inactive
-        users[userIndex].is_active = false;
-        
-        logActivity(req.user.userId, 'delete_user', `Deleted user: ${user.username}`);
-        
-        res.json({
-            success: true,
-            message: 'User deleted successfully'
-        });
-        
-    } catch (error) {
-        console.error('Delete user error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to delete user'
-        });
-    }
+app.post('/api/auth/validate', authenticate, (req, res) => {
+    res.json({
+        success: true,
+        valid: true,
+        user: req.user
+    });
 });
 
 // ========== FORM MANAGEMENT ==========
@@ -470,7 +330,7 @@ app.get('/api/forms/my-links', authenticate, (req, res) => {
     }
 });
 
-// ========== FORM SUBMISSION WITH CUSTOM HEADER ==========
+// ========== FORM SUBMISSION ==========
 app.post('/api/submissions/submit/:linkCode', (req, res) => {
     try {
         const { linkCode } = req.params;
@@ -510,9 +370,6 @@ app.post('/api/submissions/submit/:linkCode', (req, res) => {
             submission_data: form_data,
             submitted_at: new Date().toISOString(),
             status: 'pending',
-            review_notes: null,
-            reviewed_by: null,
-            reviewed_at: null,
             unit_number: link.unit_number,
             sales_agent: link.sales_agent
         };
@@ -542,7 +399,25 @@ app.post('/api/submissions/submit/:linkCode', (req, res) => {
     }
 });
 
-// ========== DASHBOARD & STATISTICS ==========
+app.get('/api/submissions/my-submissions', authenticate, (req, res) => {
+    try {
+        const userSubmissions = submissions.filter(sub => sub.user_id === req.user.userId);
+        
+        res.json({
+            success: true,
+            data: userSubmissions
+        });
+        
+    } catch (error) {
+        console.error('Get submissions error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to retrieve submissions'
+        });
+    }
+});
+
+// ========== DASHBOARD STATISTICS ==========
 app.get('/api/dashboard/stats', authenticate, (req, res) => {
     try {
         const userLinks = formLinks.filter(link => link.user_id === req.user.userId);
@@ -551,15 +426,12 @@ app.get('/api/dashboard/stats', authenticate, (req, res) => {
         
         const stats = {
             total_links: userLinks.length,
-            active_links: userLinks.filter(link => link.status === 'active' && new Date(link.expires_at) >= new Date()).length,
+            active_links: userLinks.filter(link => new Date(link.expires_at) >= new Date()).length,
             expired_links: expiredLinks,
             total_submissions: userSubmissions.length,
-            pending_submissions: userSubmissions.filter(sub => sub.status === 'pending').length,
-            approved_submissions: userSubmissions.filter(sub => sub.status === 'approved').length,
-            rejected_submissions: userSubmissions.filter(sub => sub.status === 'rejected').length
+            pending_submissions: userSubmissions.filter(sub => sub.status === 'pending').length
         };
         
-        // Admin stats
         if (req.user.role === 'admin') {
             stats.total_users = users.length;
             stats.active_users = users.filter(u => u.is_active).length;
@@ -581,15 +453,208 @@ app.get('/api/dashboard/stats', authenticate, (req, res) => {
     }
 });
 
-// ========== HEALTH CHECK ==========
-app.get('/api/health', (req, res) => {
+// ========== USER MANAGEMENT (ADMIN ONLY) ==========
+app.get('/api/admin/users', authenticate, isAdmin, (req, res) => {
+    try {
+        const userList = users.map(user => {
+            const { password, ...userData } = user;
+            return userData;
+        });
+        
+        res.json({
+            success: true,
+            data: userList
+        });
+        
+    } catch (error) {
+        console.error('Get users error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to retrieve users'
+        });
+    }
+});
+
+app.post('/api/admin/users', authenticate, isAdmin, async (req, res) => {
+    try {
+        const { username, email, full_name, role, department, password } = req.body;
+        
+        if (!username || !email || !full_name || !role || !password) {
+            return res.status(400).json({
+                success: false,
+                message: 'All fields are required'
+            });
+        }
+        
+        if (users.find(u => u.username === username)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Username already exists'
+            });
+        }
+        
+        if (users.find(u => u.email === email)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Email already exists'
+            });
+        }
+        
+        const newUser = {
+            id: users.length + 1,
+            username,
+            email,
+            full_name,
+            role,
+            department: department || null,
+            password: await bcrypt.hash(password, 10),
+            is_active: true,
+            created_at: new Date().toISOString(),
+            last_login: null
+        };
+        
+        users.push(newUser);
+        
+        logActivity(req.user.userId, 'create_user', `Created user: ${username}`);
+        
+        const { password: _, ...userData } = newUser;
+        
+        res.status(201).json({
+            success: true,
+            message: 'User created successfully',
+            data: userData
+        });
+        
+    } catch (error) {
+        console.error('Create user error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to create user'
+        });
+    }
+});
+
+app.put('/api/admin/users/:userId', authenticate, isAdmin, async (req, res) => {
+    try {
+        const userId = parseInt(req.params.userId);
+        const { email, full_name, role, department, is_active, password } = req.body;
+        
+        const user = users.find(u => u.id === userId);
+        
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+        
+        if (email !== undefined) user.email = email;
+        if (full_name !== undefined) user.full_name = full_name;
+        if (role !== undefined) user.role = role;
+        if (department !== undefined) user.department = department;
+        if (is_active !== undefined) user.is_active = is_active;
+        
+        if (password) {
+            user.password = await bcrypt.hash(password, 10);
+        }
+        
+        logActivity(req.user.userId, 'update_user', `Updated user: ${user.username}`);
+        
+        const { password: _, ...userData } = user;
+        
+        res.json({
+            success: true,
+            message: 'User updated successfully',
+            data: userData
+        });
+        
+    } catch (error) {
+        console.error('Update user error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to update user'
+        });
+    }
+});
+
+app.delete('/api/admin/users/:userId', authenticate, isAdmin, (req, res) => {
+    try {
+        const userId = parseInt(req.params.userId);
+        
+        if (userId === req.user.userId) {
+            return res.status(400).json({
+                success: false,
+                message: 'Cannot delete your own account'
+            });
+        }
+        
+        const userIndex = users.findIndex(u => u.id === userId);
+        
+        if (userIndex === -1) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+        
+        const user = users[userIndex];
+        users[userIndex].is_active = false;
+        
+        logActivity(req.user.userId, 'delete_user', `Deleted user: ${user.username}`);
+        
+        res.json({
+            success: true,
+            message: 'User deleted successfully'
+        });
+        
+    } catch (error) {
+        console.error('Delete user error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to delete user'
+        });
+    }
+});
+
+// ========== ROOT ENDPOINT ==========
+app.get('/', (req, res) => {
     res.json({
-        success: true,
-        status: 'OK',
-        message: 'Digital Forms API is running',
-        timestamp: new Date().toISOString(),
+        service: 'Digital Forms Management System API',
+        status: 'running',
         version: '1.0.0',
-        environment: process.env.NODE_ENV || 'production'
+        environment: process.env.NODE_ENV || 'production',
+        endpoints: {
+            health: 'GET /api/health',
+            login: 'POST /api/auth/login',
+            change_password: 'POST /api/auth/change-password',
+            create_link: 'POST /api/forms/create-link',
+            my_links: 'GET /api/forms/my-links',
+            submit_form: 'POST /api/submissions/submit/:code',
+            my_submissions: 'GET /api/submissions/my-submissions',
+            dashboard_stats: 'GET /api/dashboard/stats',
+            admin_users: 'GET /api/admin/users'
+        },
+        timestamp: new Date().toISOString()
+    });
+});
+
+// ========== 404 HANDLER ==========
+app.use((req, res) => {
+    res.status(404).json({
+        success: false,
+        error: 'Endpoint not found',
+        path: req.path,
+        method: req.method
+    });
+});
+
+// ========== ERROR HANDLER ==========
+app.use((err, req, res, next) => {
+    console.error('Server error:', err);
+    res.status(500).json({
+        success: false,
+        error: 'Internal server error',
+        message: err.message
     });
 });
 
@@ -599,19 +664,22 @@ app.listen(PORT, () => {
     🚀 Digital Forms API Server Started!
     ⏱️  Port: ${PORT}
     🌐 Environment: ${process.env.NODE_ENV || 'production'}
+    🔑 JWT Secret: ${JWT_SECRET ? 'Set' : 'Default'}
     📅 ${new Date().toLocaleString()}
     
     📋 Available Endpoints:
-    ✅ POST /api/auth/login          - User login
+    ✅ GET  /api/health          - Health check
+    ✅ POST /api/auth/login      - User login
     ✅ POST /api/auth/change-password - Change password
-    ✅ POST /api/forms/create-link   - Create form link
-    ✅ GET  /api/forms/my-links      - Get user's links
+    ✅ POST /api/forms/create-link - Create form link
+    ✅ GET  /api/forms/my-links  - Get user's links
     ✅ POST /api/submissions/submit/:code - Submit form
-    ✅ GET  /api/dashboard/stats     - Dashboard statistics
-    ✅ GET  /api/admin/users         - Admin: Get all users
-    ✅ POST /api/admin/users         - Admin: Create user
-    ✅ PUT  /api/admin/users/:id     - Admin: Update user
-    ✅ DELETE /api/admin/users/:id   - Admin: Delete user
+    ✅ GET  /api/submissions/my-submissions - Get submissions
+    ✅ GET  /api/dashboard/stats - Dashboard statistics
+    ✅ GET  /api/admin/users     - Admin: Get all users
+    ✅ POST /api/admin/users     - Admin: Create user
+    ✅ PUT  /api/admin/users/:id - Admin: Update user
+    ✅ DELETE /api/admin/users/:id - Admin: Delete user
     
     🔐 Demo Users:
        Admin:  admin / admin123
